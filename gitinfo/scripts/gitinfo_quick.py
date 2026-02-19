@@ -43,18 +43,20 @@ def best_effort_cmd(args: list[str], cwd: Path | None = None) -> tuple[bool, str
 def parse_repo_target(raw: str) -> RepoTarget:
     raw = raw.strip()
 
-    # SSH-like: git@github.com:owner/repo(.git)
-    ssh_match = re.match(r"^git@github\.com:(?P<owner>[^/]+)/(?P<repo>[^/?#]+?)(?:\.git)?$", raw)
+    ssh_match = re.match(
+        r"^git@github\.com:(?P<owner>[^/]+)/(?P<repo>[^/?#]+?)(?:\.git)?$", raw
+    )
     if ssh_match:
         owner = ssh_match.group("owner")
         repo = ssh_match.group("repo")
-        return RepoTarget(owner=owner, repo=repo, canonical_url=f"https://github.com/{owner}/{repo}")
+        return RepoTarget(
+            owner=owner, repo=repo, canonical_url=f"https://github.com/{owner}/{repo}"
+        )
 
     parsed = urlparse(raw)
     if parsed.netloc.lower() not in {"github.com", "www.github.com"}:
         raise ValueError(f"Unsupported URL (GitHub required): {raw}")
 
-    # Drop query/fragment by only using path.
     path_parts = [p for p in parsed.path.split("/") if p]
     if len(path_parts) < 2:
         raise ValueError(f"Cannot parse owner/repo from URL: {raw}")
@@ -71,7 +73,7 @@ def parse_repo_target(raw: str) -> RepoTarget:
 
 def github_request(url: str, token: str | None = None) -> tuple[int, dict[str, str], str]:
     headers = {
-        "User-Agent": "gitinfo-skill/1.0",
+        "User-Agent": "gitinfo-skill/2.0",
         "Accept": "application/vnd.github+json",
     }
     if token:
@@ -117,7 +119,7 @@ def match_origin(origin_url: str, owner: str, repo: str) -> bool:
     return "github.com" in lower and f"{owner.lower()}/{repo.lower()}" in lower
 
 
-def collect_tree_top2(repo_dir: Path) -> list[str]:
+def collect_tree(repo_dir: Path, max_depth: int = 3, max_items: int = 400) -> list[str]:
     entries: list[str] = []
     root_depth = len(repo_dir.parts)
     for root, dirs, files in os.walk(repo_dir):
@@ -125,33 +127,78 @@ def collect_tree_top2(repo_dir: Path) -> list[str]:
         rel_depth = len(current.parts) - root_depth
         if ".git" in dirs:
             dirs.remove(".git")
-        if rel_depth > 2:
+        if rel_depth > max_depth:
             dirs[:] = []
             continue
 
-        for name in dirs:
-            p = current / name
-            rel = p.relative_to(repo_dir)
-            if len(rel.parts) <= 2:
-                entries.append(str(rel))
-        for name in files:
-            p = current / name
-            rel = p.relative_to(repo_dir)
-            if len(rel.parts) <= 2:
-                entries.append(str(rel))
+        for name in sorted(dirs):
+            rel = (current / name).relative_to(repo_dir)
+            entries.append(str(rel) + "/")
+        for name in sorted(files):
+            rel = (current / name).relative_to(repo_dir)
+            entries.append(str(rel))
 
-    return sorted(set(entries))[:200]
+        if len(entries) >= max_items:
+            return entries[:max_items]
+    return entries[:max_items]
 
 
-def first_existing(paths: list[Path]) -> str:
-    for p in paths:
-        if p.exists():
-            return p.name
-    return "none"
+def collect_key_files(repo_dir: Path) -> list[str]:
+    patterns = [
+        "README.md",
+        "README.MD",
+        "readme.md",
+        "docs",
+        "package.json",
+        "pyproject.toml",
+        "requirements.txt",
+        "Cargo.toml",
+        "go.mod",
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "Makefile",
+        "docker-compose.yml",
+        "docker-compose.yaml",
+    ]
+    hits: list[str] = []
+    for p in patterns:
+        candidate = repo_dir / p
+        if candidate.exists():
+            hits.append(str(candidate.relative_to(repo_dir)))
+
+    # Add shallow key files under src/app/cmd if present.
+    for root_name in ["src", "app", "cmd", "server", "api"]:
+        base = repo_dir / root_name
+        if not base.exists() or not base.is_dir():
+            continue
+        for child in sorted(base.iterdir()):
+            if child.is_file() and child.suffix in {
+                ".ts",
+                ".tsx",
+                ".js",
+                ".jsx",
+                ".py",
+                ".go",
+                ".rs",
+                ".swift",
+                ".java",
+            }:
+                hits.append(str(child.relative_to(repo_dir)))
+            if len(hits) >= 40:
+                break
+    return sorted(set(hits))[:60]
+
+
+def count_tracked_files(repo_dir: Path) -> int:
+    ok, out = best_effort_cmd(["git", "ls-files"], cwd=repo_dir)
+    if ok and out:
+        return len([line for line in out.splitlines() if line.strip()])
+    return sum(1 for p in repo_dir.rglob("*") if p.is_file() and ".git" not in p.parts)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="gitinfo quick analyzer")
+    parser = argparse.ArgumentParser(description="gitinfo quick collector")
     parser.add_argument("--repo-url", required=True, help="GitHub repository URL")
     parser.add_argument("--sources-root", default="~/workspace/sources")
     parser.add_argument("--output-root", default="~/workspace/sources/gitinfo-outputs")
@@ -189,13 +236,14 @@ def main() -> int:
                 print(err, file=sys.stderr)
 
     if args.ref:
-        try:
-            subprocess.run(["git", "checkout", args.ref], cwd=local_repo_dir, check=True)
-        except subprocess.CalledProcessError:
+        ok, err = best_effort_cmd(["git", "checkout", args.ref], cwd=local_repo_dir)
+        if not ok:
             print(f"Warning: checkout failed for ref {args.ref}, continue with current HEAD", file=sys.stderr)
+            if err:
+                print(err, file=sys.stderr)
 
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    run_dir = output_root / f"{target.repo}-{timestamp}"
+    run_dir = output_root / f"{timestamp}-{target.repo}"
     raw_dir = run_dir / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
 
@@ -236,7 +284,7 @@ def main() -> int:
     latest_release_tag = release_json.get("tag_name") or "n/a"
     latest_release_date = release_json.get("published_at") or "n/a"
 
-    contributor_count = "n/a"
+    contributor_count: int | str = "n/a"
     if isinstance(contrib_json, list):
         contributor_count = len(contrib_json)
 
@@ -267,12 +315,20 @@ def main() -> int:
             write_text(raw_dir / "cloc.txt", out + "\n")
             code_stats_source = "cloc"
 
+    tracked_files_count = count_tracked_files(local_repo_dir)
     if code_stats_source == "file-count":
-        file_count = sum(1 for p in local_repo_dir.rglob("*") if p.is_file() and ".git" not in p.parts)
-        write_text(raw_dir / "file-count.txt", f"{file_count}\n")
+        write_text(raw_dir / "file-count.txt", f"{tracked_files_count}\n")
 
-    tree_entries = collect_tree_top2(local_repo_dir)
-    write_text(raw_dir / "tree-top2.txt", "\n".join(tree_entries) + ("\n" if tree_entries else ""))
+    tree_entries = collect_tree(local_repo_dir, max_depth=3, max_items=400)
+    write_text(
+        raw_dir / "tree-depth3.txt",
+        "\n".join(tree_entries) + ("\n" if tree_entries else ""),
+    )
+
+    key_files = collect_key_files(local_repo_dir)
+    write_text(
+        raw_dir / "key-files.txt", "\n".join(key_files) + ("\n" if key_files else "")
+    )
 
     deepwiki_status = "missing_or_blocked"
     deepwiki_http = safe_json_load(raw_dir / "deepwiki.http.json")
@@ -304,17 +360,130 @@ def main() -> int:
             "lastCommitHash": last_commit_hash,
             "lastCommitDate": last_commit_date,
             "lastCommitAuthor": last_commit_author,
+            "trackedFilesCount": tracked_files_count,
             "codeStatsSource": code_stats_source,
             "deepwikiStatus": deepwiki_status,
+        },
+        "materialFiles": {
+            "repoJson": "raw/repo.json",
+            "releaseJson": "raw/release.json",
+            "contributorsJson": "raw/contributors.json",
+            "deepwikiHtml": "raw/deepwiki.html",
+            "tree": "raw/tree-depth3.txt",
+            "keyFiles": "raw/key-files.txt",
+            "codeStats": f"raw/{'scc.txt' if code_stats_source == 'scc' else ('cloc.txt' if code_stats_source == 'cloc' else 'file-count.txt')}",
         },
     }
     write_json(run_dir / "facts.json", facts)
 
-    context_md = f"""# gitinfo 合并报告（深入分析上下文）\n\n这是后续深入研究的主上下文文件。该文件已合并“快速摘要 + 架构概要 + 上下文指引”。\n\n## 一、仓库信息\n\n- 名称：{target.owner}/{target.repo}\n- URL：{target.canonical_url}\n- 本地路径：{local_repo_dir}\n- 输出目录：{run_dir}\n- 生成时间（UTC）：{now_utc_iso()}\n\n## 二、快速摘要\n\n- Stars：{stars}\n- Forks：{forks}\n- Watchers：{watchers}\n- Open issues：{open_issues}\n- License：{license_spdx}\n- 默认分支：{default_branch}\n- 最近推送：{pushed_at}\n- 最新发布：{latest_release_tag}（{latest_release_date}）\n- 贡献者数量（API样本）：{contributor_count}\n- 近30天提交数：{commits_30d}\n- 近90天提交数：{commits_90d}\n- 最新提交：{last_commit_hash}，作者 {last_commit_author}，时间 {last_commit_date}\n- 代码统计来源：{code_stats_source}\n- DeepWiki 状态：{deepwiki_status}\n\n## 三、架构概要（Quick）\n\n### 1) 高层观察\n- 项目描述：{description}\n- 默认分支：{default_branch}\n- 最近推送：{pushed_at}\n\n### 2) 结构轮廓\n- 请先阅读 `raw/tree-top2.txt`，它是项目边界的主视图（顶层与二级目录）。\n\n### 3) 运行与入口线索\n- package.json 的 scripts / main 字段\n- cmd/、bin/、src/main*、app*、server*、cli* 目录\n- docker-compose、Makefile、CI workflow 中的 build/run 路径\n\n### 4) 扩展点线索\n- 优先关注 plugin/provider/channel/adapter 风格目录及其注册代码。\n\n### 5) 说明\n- 这里仅提供高层架构概要，不展开具体模块实现细节。\n\n## 四、证据路径\n\n- 结构化事实：facts.json\n- 原始数据与扫描结果：raw/\n- 目录样本：raw/tree-top2.txt\n- 代码统计：raw/scc.txt 或 raw/cloc.txt 或 raw/file-count.txt\n- DeepWiki 抓取：raw/deepwiki.html 与 raw/deepwiki.http.json\n\n## 五、建议的下一步提问\n\n- “基于这份上下文，用 6-10 步解释运行时请求生命周期。”\n- “梳理最关键的 5 个子系统及其边界。”\n- “列出可能的扩展点，以及新增功能应从哪里接入。”\n"""
-    write_text(run_dir / "context.md", context_md)
+    collector_summary = f"""# gitinfo 素材采集结果（仅客观信息）
 
-    print("gitinfo complete")
+此文件仅记录采集结果，不包含架构结论。
+
+- 仓库：{target.owner}/{target.repo}
+- 规范化 URL：{target.canonical_url}
+- 本地仓库：{local_repo_dir}
+- 输出目录：{run_dir}
+- 生成时间（UTC）：{now_utc_iso()}
+
+## 客观快照
+
+- Stars：{stars}
+- Forks：{forks}
+- Watchers：{watchers}
+- Open issues：{open_issues}
+- License：{license_spdx}
+- 默认分支：{default_branch}
+- 最近推送：{pushed_at}
+- 最新发布：{latest_release_tag}（{latest_release_date}）
+- 贡献者数量（API样本）：{contributor_count}
+- 近30天提交数：{commits_30d}
+- 近90天提交数：{commits_90d}
+- 最新提交：{last_commit_hash}，作者 {last_commit_author}，时间 {last_commit_date}
+- 跟踪文件数：{tracked_files_count}
+- 代码统计来源：{code_stats_source}
+- DeepWiki 状态：{deepwiki_status}
+
+## 素材文件
+
+- facts.json
+- raw/repo.json
+- raw/release.json
+- raw/contributors.json
+- raw/deepwiki.html
+- raw/tree-depth3.txt
+- raw/key-files.txt
+"""
+    write_text(run_dir / "collector-summary.md", collector_summary)
+
+    context_draft = f"""# gitinfo 报告（待补全）
+
+## 一、项目定位（待补全）
+
+- 仓库：{target.owner}/{target.repo}
+- 项目描述（GitHub）：{description}
+- 目标：请结合 README 与关键源码，补全“这个项目做什么、解决什么问题、面向谁”。
+
+## 二、客观数据快照
+
+- Stars：{stars}
+- Forks：{forks}
+- Watchers：{watchers}
+- Open issues：{open_issues}
+- License：{license_spdx}
+- 默认分支：{default_branch}
+- 最近推送：{pushed_at}
+- 最新发布：{latest_release_tag}（{latest_release_date}）
+- 贡献者数量（API样本）：{contributor_count}
+- 近30天提交数：{commits_30d}
+- 近90天提交数：{commits_90d}
+- 最新提交：{last_commit_hash}，作者 {last_commit_author}，时间 {last_commit_date}
+- 跟踪文件数：{tracked_files_count}
+- 代码统计来源：{code_stats_source}
+- DeepWiki 状态：{deepwiki_status}
+
+## 三、状态判断（待补全）
+
+- 请基于“客观数据快照”补充 3-5 条简评：
+- 规模（大/中/小）
+- 热度（高/中/低）
+- 活跃度（高/中/低）
+- 维护风险（低/中/高）
+
+## 四、业务架构概要（待补全）
+
+- 请基于 README + `raw/tree-depth3.txt` + `raw/key-files.txt` + 关键源码补全：
+1. 核心功能
+2. 业务模块分工
+3. 关键技术与依赖
+4. 功能如何被模块与技术支撑
+
+## 五、关键流程（待补全）
+
+- 用 6-10 步描述核心业务流程（业务视角，不展开实现细节）。
+
+## 六、风险与边界（待补全）
+
+- 维护风险、耦合风险、扩展边界，各给出 1-3 条。
+
+## 七、证据索引
+
+- 采集摘要：`collector-summary.md`
+- 结构化数据：`facts.json`
+- 仓库元信息：`raw/repo.json`
+- 发布信息：`raw/release.json`
+- 贡献者：`raw/contributors.json`
+- DeepWiki 原文：`raw/deepwiki.html`
+- 目录树：`raw/tree-depth3.txt`
+- 关键文件清单：`raw/key-files.txt`
+- 代码统计：`{facts["materialFiles"]["codeStats"]}`
+"""
+    write_text(run_dir / "context.md", context_draft)
+
+    print("gitinfo collection complete")
     print(f"RUN_DIR={run_dir}")
+    print(f"FACTS_FILE={run_dir / 'facts.json'}")
+    print(f"COLLECTOR_SUMMARY={run_dir / 'collector-summary.md'}")
     print(f"CONTEXT_FILE={run_dir / 'context.md'}")
     print(f"SANITIZED_REPO_URL={target.canonical_url}")
     return 0
