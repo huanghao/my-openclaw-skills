@@ -8,10 +8,9 @@ user-invocable: true
 
 # gitinfo
 
-`gitinfo` 分为两个阶段：
-
-- 阶段 A：脚本只做“素材采集”（客观信息）
-- 阶段 B：Agent 基于素材 + 实际代码阅读生成结论
+`gitinfo` 分两步：
+- Stage A：脚本采集客观素材
+- Stage B：Agent 读素材和源码，产出最终报告
 
 ## Invocation
 
@@ -22,28 +21,31 @@ user-invocable: true
 
 - Root: `~/workspace/sources/gitinfo-outputs`
 - Run folder: `<timestamp>-<repo>/`
-- Final report file: `context.md` (中文)
+- Stage A draft: `report.stage-a.md`
+- Final report: `report.md`（中文）
 
-## Stage A: 运行采集脚本（只采集，不下结论）
+## Stage A：运行采集脚本（只采集，不下结论）
 
 ```bash
-python3 "{baseDir}/scripts/gitinfo_quick.py" --repo-url "<url>"
+python3 "{baseDir}/scripts/gitinfo_quick.py" \
+  --repo-url "<url>" \
+  --draft-report-file "report.stage-a.md"
 ```
 
-采集后将得到：
+产出：
 
 - `collector-summary.md`（客观采集摘要）
 - `facts.json`（结构化指标）
 - `raw/*`（GitHub API、DeepWiki、目录树、关键文件清单、代码统计）
-- `context.md`（自动生成的分析初稿，待 Agent 补全）
+- `report.stage-a.md`（报告草稿）
 
-## Stage B: Agent 生成最终 `context.md`
+## Stage B：生成最终 `report.md`
 
-在脚本完成后，Agent 需要继续阅读并分析：
-
-1. 先读采集物：`collector-summary.md`, `facts.json`, `raw/key-files.txt`, `raw/tree-depth3.txt`, `context.md`
-2. 再读仓库关键源码与文档：README、核心入口文件、关键目录
-3. 在 `context.md` 初稿上补全并覆盖为最终中文报告
+1. 读取采集物：`collector-summary.md`, `facts.json`, `raw/key-files.txt`, `raw/tree-depth3.txt`, `report.stage-a.md`
+2. 阅读仓库关键源码与文档：README、核心入口文件、关键目录
+3. 基于 `report.stage-a.md` 完成最终中文报告
+4. 将最终内容写回 `<run_dir>/report.md`（不能只留在对话里）
+5. 最终回复必须附上 `report.md` 绝对路径
 
 ## 报告原则（必须遵守）
 
@@ -53,7 +55,7 @@ python3 "{baseDir}/scripts/gitinfo_quick.py" --repo-url "<url>"
 - 不确定就标注“待确认”，不要硬猜。
 - 避免空洞目录罗列，必须有抽象与总结。
 
-## `context.md` 结构（建议）
+## `report.md` 结构（建议）
 
 1. 项目定位（一句话 + 目标用户/场景）
 2. 当前状态判断（指标 + 3-5 条简评）
@@ -69,4 +71,4 @@ python3 "{baseDir}/scripts/gitinfo_quick.py" --repo-url "<url>"
 ## Notes
 
 - 采集脚本只负责“拿素材”，不负责“输出架构结论”。
-- 最终给用户看的主文件是 `context.md`。
+- 最终给用户看的主文件是 `report.md`。

@@ -203,6 +203,8 @@ def main() -> int:
     parser.add_argument("--sources-root", default="~/workspace/sources")
     parser.add_argument("--output-root", default="~/workspace/sources/gitinfo-outputs")
     parser.add_argument("--ref", default="")
+    parser.add_argument("--draft-report-file", default="report.stage-a.md")
+    parser.add_argument("--final-report-file", default="report.md")
     args = parser.parse_args()
 
     try:
@@ -416,7 +418,9 @@ def main() -> int:
 """
     write_text(run_dir / "collector-summary.md", collector_summary)
 
-    context_draft = f"""# gitinfo 报告（待补全）
+    draft_report_name = Path(args.draft_report_file).name or "report.stage-a.md"
+
+    context_draft = f"""# gitinfo 报告（Stage A 草稿，待补全）
 
 ## 一、项目定位（待补全）
 
@@ -478,13 +482,14 @@ def main() -> int:
 - 关键文件清单：`raw/key-files.txt`
 - 代码统计：`{facts["materialFiles"]["codeStats"]}`
 """
-    write_text(run_dir / "context.md", context_draft)
+    write_text(run_dir / draft_report_name, context_draft)
 
     print("gitinfo collection complete")
     print(f"RUN_DIR={run_dir}")
     print(f"FACTS_FILE={run_dir / 'facts.json'}")
     print(f"COLLECTOR_SUMMARY={run_dir / 'collector-summary.md'}")
-    print(f"CONTEXT_FILE={run_dir / 'context.md'}")
+    print(f"DRAFT_REPORT_FILE={run_dir / draft_report_name}")
+    print(f"FINAL_REPORT_FILE={run_dir / (Path(args.final_report_file).name or 'report.md')}")
     print(f"SANITIZED_REPO_URL={target.canonical_url}")
     return 0
 
