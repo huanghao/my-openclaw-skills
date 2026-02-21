@@ -65,13 +65,6 @@ user-invocable: true
 - Top 列表里每条都必须出现 `[标题](http` 和 `[评论`。
 - 如果任意一条不满足，先修正全文再发送，禁止直接发送。
 
-【投递】
-- 用 message 工具发送到：
-  - channel: feishu
-  - to: oc_59120222c7b5e3d7f5d6de76aeb2ff22
-  - message: 上面完整正文（原样）
-- 发送后最终只回复：NO_REPLY
-
 【工具限制】
 - 只允许使用：read、write、web_fetch、message
 - 严禁使用：browser、exec、feishu_doc、feishu_drive
