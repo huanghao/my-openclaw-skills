@@ -8,44 +8,60 @@ user-invocable: true
 
 # gitinfo
 
-`gitinfo` 分两步：
-- Stage A：脚本采集客观素材
-- Stage B：Agent 读素材和源码，产出最终报告
+## 变量定义
 
-## Invocation
+- `<url>`：用户输入的 GitHub 仓库 URL（调用格式：`/gitinfo <url>`）
+- `<repo>`：从 `<url>` 解析出的仓库名（不含 owner）
+- `<local_repo_path>`：Step 1 产出的本地仓库目录
+- `<timestamp>`：运行时间戳，格式 `YYYYMMDD-HHMMSS`
+- `<run_dir>`：Step 2 产出的本次运行目录
+- `<raw_dir>`：`<run_dir>/raw`
+- `<report_file>`：最终报告文件，固定为 `<run_dir>/report.md`
 
-- Command: `/gitinfo <url>`
-- Example: `/gitinfo https://github.com/openclaw/openclaw`
+## 目录位置
 
-## Output location
+- `<sources_root>`：`~/workspace/sources`
+- `<local_repo_path>`：`<sources_root>/<repo>`
+- `<output_root>`：`<sources_root>/gitinfo-outputs`
+- `<run_dir>`：`<output_root>/<timestamp>-<repo>`
+- `<raw_dir>`：`<run_dir>/raw`
+- `<report_file>`：`<run_dir>/report.md`
 
-- Root: `~/workspace/sources/gitinfo-outputs`
-- Run folder: `<timestamp>-<repo>/`
-- Stage A draft: `report.stage-a.md`
-- Final report: `report.md`（中文）
+## 输入/输出契约
 
-## Stage A：运行采集脚本（只采集，不下结论）
+- Step 1 输入：`<url>`；输出：`<local_repo_path>`
+- Step 2 输入：`<local_repo_path>`；输出：`<run_dir>`
+- Step 3 输入：`<run_dir>` 下采集物与源码；输出：`<report_file>`（中文）
+
+## 执行路径约定（必须）
+
+## Step 1：准备本地仓库
 
 ```bash
-python3 "{baseDir}/scripts/gitinfo_quick.py" \
-  --repo-url "<url>" \
-  --draft-report-file "report.stage-a.md"
+python3 {baseDir}/scripts/gitinfo_repo_sync.py \
+  --repo-url "<url>"
+```
+
+成功后读取脚本输出中的 `LOCAL_REPO_PATH`，作为 `<local_repo_path>`。
+
+## Step 2：运行采集脚本
+
+```bash
+python3 {baseDir}/scripts/gitinfo_quick.py \
+  --repo-dir "<local_repo_path>"
 ```
 
 产出：
 
 - `collector-summary.md`（客观采集摘要）
-- `facts.json`（结构化指标）
-- `raw/*`（GitHub API、DeepWiki、目录树、关键文件清单、代码统计）
-- `report.stage-a.md`（报告草稿）
+- `raw/*`（GitHub API、DeepWiki、目录树、关键文件清单、代码统计等原始/近原始材料）
 
-## Stage B：生成最终 `report.md`
+## Step 3：生成最终 `report.md`
 
-1. 读取采集物：`collector-summary.md`, `facts.json`, `raw/key-files.txt`, `raw/tree-depth3.txt`, `report.stage-a.md`
+1. 读取采集物：`collector-summary.md`, `raw/key-files.txt`, `raw/tree-depth3.txt`, `raw/*`
 2. 阅读仓库关键源码与文档：README、核心入口文件、关键目录
-3. 基于 `report.stage-a.md` 完成最终中文报告
-4. 将最终内容写回 `<run_dir>/report.md`（不能只留在对话里）
-5. 最终回复必须附上 `report.md` 绝对路径
+3. 将最终内容写回 `<report_file>`（不能只留在对话里）
+4. 最终回复必须附上 `<report_file>` 绝对路径
 
 ## 报告原则（必须遵守）
 
@@ -54,21 +70,12 @@ python3 "{baseDir}/scripts/gitinfo_quick.py" \
 - 讲“能力如何达成”：核心功能 -> 业务模块 -> 关键技术/依赖 -> 支撑关系。
 - 不确定就标注“待确认”，不要硬猜。
 - 避免空洞目录罗列，必须有抽象与总结。
+- 报告语言必须为中文。
 
 ## `report.md` 结构（建议）
 
 1. 项目定位（一句话 + 目标用户/场景）
 2. 当前状态判断（指标 + 3-5 条简评）
-3. 业务架构概要
-   - 核心功能
-   - 业务模块分工
-   - 关键技术与依赖
-   - 功能是如何被这些模块/技术支撑的
-4. 关键流程（6-10 步，业务视角）
+3. 业务架构概要（核心功能、业务模块分工、关键技术与依赖、支撑关系）
+4. 关键流程（建议 3-8 步，按复杂度调整，业务视角）
 5. 风险与边界（维护风险、耦合风险、扩展边界）
-6. 证据索引（引用 `raw/*` 和关键代码路径）
-
-## Notes
-
-- 采集脚本只负责“拿素材”，不负责“输出架构结论”。
-- 最终给用户看的主文件是 `report.md`。
