@@ -1,0 +1,65 @@
+---
+name: dida-cli
+description: 用 `dida` 命令行管理 Dida365（滴答清单/TickTick）个人待办：创建、查询、更新、完成、删除任务与项目。适用于“帮我管理我的 TODO 清单/待办事项”这类请求。
+homepage: https://github.com/huanghao/dida365-cli
+metadata: {"openclaw":{"emoji":"🗓️","requires":{"bins":["dida"]},"install":[{"id":"brew","kind":"brew","formula":"huanghao/tap/dida","bins":["dida"],"label":"Install dida365-cli (brew tap)"}]}}
+user-invocable: true
+---
+
+# Dida365 CLI
+
+Use `dida` to manage personal TODOs in Dida365 (TickTick / 滴答清单) from terminal commands.
+
+Setup
+
+- Ensure CLI is available: `dida version --json`
+- Install (Homebrew): `brew tap huanghao/tap && brew install dida`
+- Auth must be completed before task operations:
+  - `dida auth status --json`
+  - Required status fields: `access_token_set: true`, `client_id_set: true`, `redirect_uri_set: true`
+- Config defaults:
+  - `~/.config/dida365-cli/config.json`
+
+Agent safety rules (must follow)
+
+- Prefer JSON output for all actionable commands: add `--json`
+- For every write operation, run `--dry-run` first, then run the real command after preview passes
+- Read commands use local 10-second cache by default; disable with `--no-cache` or `DIDA_NO_CACHE=1`
+- Repeated identical write operations are debounced within 3 seconds; avoid immediate duplicate retries
+
+Read commands
+
+- List projects: `dida projects list --json`
+- List tasks in project: `dida list --project <project_id> --json`
+- Show task detail: `dida show --project <project_id> --id <task_id> --json`
+- Common fields to inspect: `title`, `content`, `status`, `completedTime`, `dueDate`, `priority`
+
+Write commands (always dry-run first)
+
+- Create project:
+  - Preview: `dida projects create --name "Roadmap" --view-mode list --kind TASK --json --dry-run`
+  - Execute: `dida projects create --name "Roadmap" --view-mode list --kind TASK --json`
+- Create task:
+  - Preview: `dida add --project <project_id> --title "Task title" --content "Task content" --due "2026-02-25T18:00:00+0800" --priority 3 --json --dry-run`
+  - Execute: `dida add --project <project_id> --title "Task title" --content "Task content" --due "2026-02-25T18:00:00+0800" --priority 3 --json`
+- Update task:
+  - Preview: `dida update --project <project_id> --id <task_id> --title "New title" --content "New content" --due "2026-02-26T18:00:00+0800" --priority 5 --json --dry-run`
+  - Execute: `dida update --project <project_id> --id <task_id> --title "New title" --content "New content" --due "2026-02-26T18:00:00+0800" --priority 5 --json`
+- Complete task:
+  - Preview: `dida done --project <project_id> --id <task_id> --json --dry-run`
+  - Execute: `dida done --project <project_id> --id <task_id> --json`
+- Delete task:
+  - Preview: `dida delete --project <project_id> --id <task_id> --json --dry-run`
+  - Execute: `dida delete --project <project_id> --id <task_id> --json`
+
+Input limits
+
+- `dida add` enforces `< 500` characters for `--title`, `--content`, `--desc`
+
+Auth commands (when user asks explicitly)
+
+- Init OAuth app: `dida auth init --client-id <client_id> --client-secret <client_secret> --redirect-uri <redirect_uri>`
+- Open auth URL: `dida auth login`
+- Exchange code for token: `dida auth token --code <authorization_code>`
+- Refresh token: `dida auth refresh`
+- Logout: `dida auth logout`

@@ -60,8 +60,8 @@ python3 {baseDir}/scripts/gitinfo_quick.py \
 
 1. 读取采集物：`collector-summary.md`, `raw/key-files.txt`, `raw/tree-depth3.txt`, `raw/*`
 2. 阅读仓库关键源码与文档：README、核心入口文件、关键目录
-3. 将最终内容写回 `<report_file>`（不能只留在对话里）
-4. 最终回复必须附上 `<report_file>` 绝对路径
+3. 将最终内容写回 `<report_file>`
+4. 把最终报告发回对话，不要再针对报告内容做二次总结
 
 ## 报告原则（必须遵守）
 
