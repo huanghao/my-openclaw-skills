@@ -1,0 +1,4 @@
+interface:
+  display_name: "文档阅读闭环"
+  short_description: "按计划多轮阅读并产出过程材料"
+  default_prompt: "使用该技能执行 Codex 驱动的文档阅读闭环：自动轮次推进、条件化询问、并产出结构化 JSON/Markdown 过程材料。"
