@@ -1,0 +1,4 @@
+interface:
+  display_name: "KM CLI Doc & Comment"
+  short_description: "Run km-cli doc, comment, and edit workflows."
+  default_prompt: "Use local km-cli to create docs, fetch and add comments, and edit doc content with safe collaboration commands."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bump Version & Release"
+  short_description: "升级版本并完成发布闭环（含 changelog、构建与 Homebrew Formula）"
+  default_prompt: "请在当前仓库执行一次发布闭环：升级版本、更新 CHANGELOG、构建产物、更新 Homebrew tap Formula，并给出可执行结果清单。"
