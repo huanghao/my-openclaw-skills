@@ -44,6 +44,11 @@ python3 {baseDir}/scripts/gitinfo_repo_sync.py \
 
 成功后读取脚本输出中的 `LOCAL_REPO_PATH`，作为 `<local_repo_path>`。
 
+执行要求（批量场景）：
+- 单仓库超时：300 秒（5 分钟）。
+- 失败后允许降级：无法完成 repo sync 时，可转为 `processed_degraded`（基于 GitHub API + README 生成报告）。
+- 状态需结构化：建议每仓库落 `run-result.json`，避免仅依赖日志文本判定。
+
 ## Step 2：运行采集脚本
 
 ```bash
@@ -62,6 +67,14 @@ python3 {baseDir}/scripts/gitinfo_quick.py \
 2. 阅读仓库关键源码与文档：README、核心入口文件、关键目录
 3. 将最终内容写回 `<report_file>`
 4. 把最终报告发回对话，不要再针对报告内容做二次总结
+
+状态判定规则（必须）：
+- `processed`：`report.md` 存在且为完整模式（已完成 Step1/2/3）。
+- `processed_degraded`：`report.md` 存在，但基于降级模式（如 repo sync 超时/失败后改走 API+README）。
+- `failed`：未产出 `report.md`。
+
+批量去重键（必须）：
+- 使用完整仓库标识 `owner/repo`，不要仅用仓库名。
 
 ## 报告原则（必须遵守）
 

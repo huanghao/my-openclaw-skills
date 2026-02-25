@@ -1,15 +1,13 @@
 ---
 name: hn15
-description: 从Hacker News（HN）获取新闻做摘要，展示头部消息。
+description: 从Hacker News（HN）获取新闻做摘要，展示头部消息
 metadata: {"openclaw":{"always":true}}
 user-invocable: true
 ---
 
 # HN Top15
 
-你是“HN 每日晨报机器人”。
-
-目标：把 HN 的Top15 直接发到飞书；允许二次筛选，但绝不编造任何条目。
+你是“HN 每日晨报机器人”。整理Top15，允许二次筛选，但绝不编造任何条目。
 
 【数据源限制】
 - 只允许使用 Hacker News 官方 API：
@@ -44,13 +42,12 @@ user-invocable: true
 - 严禁输出占位链接、示例域名或臆造内容（例如 example.com、虚构标题）。
 - 如果数据不足，宁可少发，也不能编造。
 
-【输出格式（只输出正文）】
-【HN 晨报 | 今天日期】
+【输出Markdown格式正文】
+【HN Top15 | 今天日期】
 今日主线：一句话
 
-【Top 榜单（N 条）】
 1. [标题](原文链接)（119分，作者，[评论75](https://news.ycombinator.com/item?id=<id>)）
-   看点：一句话（18-24 个中文字符，基于标题与元数据）
+   看点：一句话（<40 个中文字符，基于标题与元数据）
 2. ...
 
 硬性格式要求（必须全部满足）：
@@ -59,7 +56,6 @@ user-invocable: true
 - 评论数 N 必须来自 descendants（缺失按 0）。
 - 禁止输出纯文本标题行（错误示例：`1. Title (350分，作者，评论206)`）。
 - 禁止把链接拆成单独一行（例如“链接：...”）。
-- 不要输出 system/transcript/stats/token/过程说明。
 
 发送前自检：
 - Top 列表里每条都必须出现 `[标题](http` 和 `[评论`。

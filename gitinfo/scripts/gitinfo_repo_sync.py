@@ -14,6 +14,12 @@ def main() -> int:
     parser.add_argument("--repo-url", required=True, help="GitHub repository URL")
     parser.add_argument("--sources-root", default="~/workspace/sources")
     parser.add_argument("--ref", default="", help="Optional git ref to checkout")
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=1,
+        help="Shallow history depth (<=0 disables shallow behavior)",
+    )
     args = parser.parse_args()
 
     try:
@@ -28,13 +34,23 @@ def main() -> int:
     local_repo_dir = resolve_repo_dir(sources_root, owner, repo)
 
     if not (local_repo_dir / ".git").exists():
+        clone_cmd = ["git", "clone"]
+        clone_cmd.extend(["--filter=blob:none", "--single-branch", "--no-tags"])
+        if args.depth > 0:
+            clone_cmd.extend(["--depth", str(args.depth)])
+        if args.ref:
+            clone_cmd.extend(["--branch", args.ref])
+        clone_cmd.extend([canonical_url, str(local_repo_dir)])
         try:
-            subprocess.run(["git", "clone", canonical_url, str(local_repo_dir)], check=True)
+            subprocess.run(clone_cmd, check=True)
         except subprocess.CalledProcessError:
             print(f"Clone failed for {canonical_url}", file=sys.stderr)
             return 1
     else:
-        ok, err = best_effort_cmd(["git", "fetch", "--all", "--tags", "--prune"], cwd=local_repo_dir)
+        fetch_cmd = ["git", "fetch", "--prune", "--no-tags", "origin"]
+        if args.depth > 0:
+            fetch_cmd.extend(["--depth", str(args.depth)])
+        ok, err = best_effort_cmd(fetch_cmd, cwd=local_repo_dir)
         if not ok:
             print(f"Warning: fetch failed, continue with local state: {local_repo_dir}", file=sys.stderr)
             if err:
@@ -42,6 +58,15 @@ def main() -> int:
 
     if args.ref:
         ok, err = best_effort_cmd(["git", "checkout", args.ref], cwd=local_repo_dir)
+        if not ok:
+            ref_fetch_cmd = ["git", "fetch", "origin", args.ref]
+            if args.depth > 0:
+                ref_fetch_cmd.extend(["--depth", str(args.depth)])
+            fetched, fetch_err = best_effort_cmd(ref_fetch_cmd, cwd=local_repo_dir)
+            if fetched:
+                ok, err = best_effort_cmd(["git", "checkout", "FETCH_HEAD"], cwd=local_repo_dir)
+            elif fetch_err:
+                err = f"{err}\n{fetch_err}".strip()
         if not ok:
             print(f"Warning: checkout failed for ref {args.ref}, continue with current HEAD", file=sys.stderr)
             if err:
