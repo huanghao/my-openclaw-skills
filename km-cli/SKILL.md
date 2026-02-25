@@ -41,6 +41,8 @@ km-cli doc create --parent-id "$PARENT_ID" --title "$TITLE" --content "$TEXT" --
 Do not mix `--content*` and `--markdown*` in the same call.
 Capture and reuse `contentId` from output.
 
+没有明确指定父文档时用 2747778972 当parent_id
+
 ## Get Document Content
 
 Fetch markdown for quick reading:
