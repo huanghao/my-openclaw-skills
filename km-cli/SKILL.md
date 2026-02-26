@@ -1,6 +1,6 @@
 ---
 name: km-cli
-description: "使用km-cli和学城文档交互，包括新建、评论、编辑操作"
+description: "使用km-cli和学城文档交互，包括新建与评论操作（edit 暂不支持）"
 ---
 
 
@@ -13,6 +13,8 @@ Collect required inputs first:
 - comment text / reply text
 
 Default to `--json` and parse structured fields instead of regex parsing plain text.
+
+`edit` 相关命令目前不稳定，默认不支持；仅处理 `auth/doc/comment`。
 
 ## Create Document
 
@@ -98,9 +100,12 @@ Use empty `--quote-id` to reply to the thread root.
 
 - Confirm target identifiers (`content_id`, `discussion_id`, `quote_id`) before writes.
 - For destructive or ambiguous edits, fetch current content first and summarize planned change.
-- After any write (`doc create`, `comment add/reply`, `edit save-version`), return key IDs and a concise result summary.
+- After any write (`doc create`, `comment add/reply`), return key IDs and a concise result summary.
 - If command returns auth/session errors, refresh login and retry once.
 
 ## Reference
 
-Use [references/km-cli-commands.md](references/km-cli-commands.md) for a compact command matrix and required flags.
+Prefer the latest man pages in the repo:
+
+- `/Users/huanghao/workspace/learning/mt-cli/man/km-cli.1`
+- `/Users/huanghao/workspace/learning/mt-cli/man/km-cli.config.5`
