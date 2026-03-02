@@ -1,0 +1,4 @@
+interface:
+  display_name: "KM Topic Research"
+  short_description: "Fast KM topic research from doc trees with reading log."
+  default_prompt: "Use $km-topic-research to analyze a topic from one or more KM docs via catalog, child docs, links, and lightweight search, then return a business-focused summary and reading list."
