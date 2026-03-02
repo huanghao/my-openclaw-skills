@@ -1,6 +1,6 @@
 ---
 name: km-cli
-description: "使用km-cli和学城文档交互，包括新建与评论操作（edit 暂不支持）"
+description: "使用km-cli和学城文档交互，包括搜索、新建与评论操作（edit 暂不支持）"
 ---
 
 
@@ -10,11 +10,13 @@ Collect required inputs first:
 
 - `content_id` for existing doc operations
 - `parent_id` and `title` for doc creation
+- `keyword` for search operations
 - comment text / reply text
 
 Default to `--json` and parse structured fields instead of regex parsing plain text.
+For `doc get-content`, do not use `--format`; read JSON and parse `data.body`.
 
-`edit` 相关命令目前不稳定，默认不支持；仅处理 `auth/doc/comment`。
+`edit` 相关命令目前不稳定，默认不支持；仅处理 `auth/doc/search/comment`。
 
 ## Create Document
 
@@ -45,18 +47,70 @@ Capture and reuse `contentId` from output.
 
 没有明确指定父文档时用 2747778972 当parent_id
 
-## Get Document Content
+## Search Content
 
-Fetch markdown for quick reading:
+Search KM documents with keyword:
 
 ```bash
-km-cli doc get-content --content-id "$CONTENT_ID" --format markdown
+km-cli search content --keyword "$KEYWORD" --limit 20 --json
 ```
 
-Fetch raw JSON when range/quote diagnostics are needed:
+Pagination with offset:
 
 ```bash
-km-cli doc get-content --content-id "$CONTENT_ID" --format json --output "$OUT_FILE"
+km-cli search content --keyword "$KEYWORD" --offset 20 --limit 10 --json
+```
+
+Search in title only:
+
+```bash
+km-cli search content --keyword "$KEYWORD" --search-title --json
+```
+
+Filter by space type (-1=all, 0=team space, 1=personal space):
+
+```bash
+km-cli search content --keyword "$KEYWORD" --space-type 0 --json
+```
+
+Get search history:
+
+```bash
+km-cli search history --json
+```
+
+## Get Document Content
+
+Fetch content JSON for reading/parsing:
+
+```bash
+km-cli doc get-content --content-id "$CONTENT_ID" --json
+```
+
+Write JSON to file when diagnostics are needed:
+
+```bash
+km-cli doc get-content --content-id "$CONTENT_ID" --json --output "$OUT_FILE"
+```
+
+Extract title/heading outline from body JSON:
+
+```bash
+km-cli doc get-content --content-id "$CONTENT_ID" --json | jq '
+  .data as $d
+  | {
+      contentId: $d.contentId,
+      title: $d.title,
+      headings: [
+        ($d.body | (fromjson? // {}) | .. | objects
+          | select(.type? == "title" or .type? == "heading")
+          | {
+              type: .type,
+              level: (.attrs.level // 1),
+              text: ([.content[]?.text // empty] | join(""))
+            })
+      ]
+    }'
 ```
 
 ## Get Comments
@@ -107,5 +161,5 @@ Use empty `--quote-id` to reply to the thread root.
 
 Prefer the latest man pages in the repo:
 
-- `/Users/huanghao/workspace/learning/mt-cli/man/km-cli.1`
-- `/Users/huanghao/workspace/learning/mt-cli/man/km-cli.config.5`
+- `/Users/huanghao/workspace/mt-cli/man/km-cli.1`
+- `/Users/huanghao/workspace/mt-cli/man/km-cli.config.5`
