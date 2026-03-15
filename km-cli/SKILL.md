@@ -1,6 +1,6 @@
 ---
 name: km-cli
-description: "使用km-cli和学城文档交互，包括搜索、新建与评论操作（edit 暂不支持）"
+description: "使用km-cli和学城文档交互，包括认证、搜索、新建与评论操作"
 ---
 
 
@@ -16,7 +16,7 @@ Collect required inputs first:
 Default to `--json` and parse structured fields instead of regex parsing plain text.
 For `doc get-content`, do not use `--format`; read JSON and parse `data.body`.
 
-`edit` 相关命令目前不稳定，默认不支持；仅处理 `auth/doc/search/comment`。
+仅处理 `auth/doc/search/comment`。
 
 ## Create Document
 
@@ -126,7 +126,13 @@ km-cli comment get --content-id "$CONTENT_ID" --limit 50 --offset 0 --json
 - Discussion threads (for reply workflow):
 
 ```bash
-km-cli comment list --content-id "$CONTENT_ID" --page-no 1 --page-size 100 --json
+km-cli comment list --content-id "$CONTENT_ID" --json
+```
+
+- Auto-fetch all discussion pages when complete coverage is needed:
+
+```bash
+km-cli comment list --content-id "$CONTENT_ID" --all --json
 ```
 
 ## Add Comments
@@ -156,6 +162,7 @@ Use empty `--quote-id` to reply to the thread root.
 - For destructive or ambiguous edits, fetch current content first and summarize planned change.
 - After any write (`doc create`, `comment add/reply`), return key IDs and a concise result summary.
 - If command returns auth/session errors, refresh login and retry once.
+- Prefer `comment list --json` over plain text for agent workflows; current JSON is already slimmed for threads/comments.
 
 ## Reference
 
